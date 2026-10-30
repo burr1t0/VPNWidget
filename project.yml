@@ -1,0 +1,78 @@
+name: VPNWidget
+options:
+  bundleIdPrefix: com.egor
+  deploymentTarget:
+    macOS: "15.0"
+  createIntermediateGroups: true
+
+# VPNCore / VPNUI come from Package.swift, so the agent, the app and the widget share one codebase.
+packages:
+  VPNWidget:
+    path: .
+
+settings:
+  base:
+    # DEVELOPMENT_TEAM is not stored here: scripts/install-app.sh takes it from the signing certificate (or VPNWIDGET_TEAM).
+    CODE_SIGN_STYLE: Automatic
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    ENABLE_HARDENED_RUNTIME: NO
+
+targets:
+  VPNWidget:
+    type: application
+    platform: macOS
+    sources: [App]
+    dependencies:
+      - package: VPNWidget
+        product: VPNCore
+      - package: VPNWidget
+        product: VPNUI
+      - target: VPNWidgetExtension
+        embed: true
+    info:
+      path: App/Info.plist
+      properties:
+        CFBundleDisplayName: VPN Widget
+        LSUIElement: true
+        LSMinimumSystemVersion: "15.0"
+        # vpnwidget://open is what a tap on the widget opens.
+        CFBundleURLTypes:
+          - CFBundleURLName: com.egor.vpnwidget
+            CFBundleURLSchemes:
+              - vpnwidget
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.egor.vpnwidget
+        GENERATE_INFOPLIST_FILE: NO
+        # Regenerate the artwork with: swift run vpn-icon App/Assets.xcassets/AppIcon.appiconset
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+
+  VPNWidgetExtension:
+    type: app-extension
+    platform: macOS
+    sources: [Widget]
+    dependencies:
+      - package: VPNWidget
+        product: VPNCore
+      - package: VPNWidget
+        product: VPNUI
+    info:
+      path: Widget/Info.plist
+      properties:
+        CFBundleDisplayName: VPN Widget
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    # Widget extensions must be sandboxed. The agent's folder is the only place the widget may touch:
+    # it reads state.json and drops command.json there (a temporary exception is fine for a locally signed app).
+    entitlements:
+      path: Widget/VPNWidgetExtension.entitlements
+      properties:
+        com.apple.security.app-sandbox: true
+        com.apple.security.temporary-exception.files.home-relative-path.read-write:
+          - /Library/Application Support/VPNWidget/
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.egor.vpnwidget.widget
+        GENERATE_INFOPLIST_FILE: NO
